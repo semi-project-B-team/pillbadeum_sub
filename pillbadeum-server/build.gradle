@@ -1,0 +1,123 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'org.semi-project'
+version = '0.0.1-SNAPSHOT'
+description = 'pillbadeum-server'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    mockitoAgent
+}
+
+dependencies {
+    // REST API
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
+    // 데이터베이스와 ORM
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    // 입력값 검증
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // REG-002/006: WEBP도 실제 디코딩·축소·메타데이터 제거를 거친다. Java ImageIO SPI를 재사용한다.
+    implementation 'com.twelvemonkeys.imageio:imageio-webp:3.12.0'
+
+    // JWT 기반 로그인·인가
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+
+    // 상태 확인과 API 문서
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
+
+    // 벡터 검색(Qdrant). 기본은 꺼져 있고 QDRANT_ENABLED=true일 때만 연결한다.
+    implementation 'io.qdrant:client:1.19.0'
+
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // Spring Boot 4의 테스트 의존성 구성은 프로젝트 예시를 따름
+    testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    mockitoAgent('org.mockito:mockito-core') {
+        transitive = false
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    jvmArgs += "-javaagent:${configurations.mockitoAgent.asPath}"
+}
+
+// 명시적으로 실행할 때만 실제 API를 1회 호출한다. 일반 test/CI에서는 이 작업을 실행하지 않는다.
+tasks.register('tryQuestionClassifier', JavaExec) {
+    group = 'verification'
+    description = '질문을 직접 입력하고 실제 분류 결과와 시간·사용량·예상 비용 확인'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'org.semiproject.pillbadeumserver.chat.QuestionClassifierCli'
+    standardInput = System.in
+}
+
+// 키 값 출력·유료 호출·DB 변경 없이 현재 챗봇 설정의 누락 항목만 확인한다.
+tasks.register('checkChatConfiguration', JavaExec) {
+    group = 'verification'
+    description = '챗봇 키·모델 설정 여부 점검 (외부 호출 없음)'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'org.semiproject.pillbadeumserver.chat.ChatConfigurationCli'
+}
+
+// 실제 API 연결은 일반 테스트와 분리한다. 합성 입력만 사용하며 DB를 변경하지 않는다.
+tasks.register('tryChatProviders', JavaExec) {
+    group = 'verification'
+    description = '실제 OpenAI 또는 공공데이터의 명시적 연결 점검 (OpenAI 모드는 유료 호출)'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'org.semiproject.pillbadeumserver.chat.ChatProviderCli'
+}
+
+// CHAT-007: 공개 품목 하나를 앱의 실제 근거 수집기로 점검한다. DB·OpenAI 호출은 없다.
+tasks.register('tryOfficialEvidence', JavaExec) {
+    group = 'verification'
+    description = '공개 품목코드의 e약은요·허가정보 상태와 소요 시간 점검'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'org.semiproject.pillbadeumserver.chat.OfficialEvidenceCli'
+}
+
+// CHAT-008: 환자 정보 없이 공개 품목의 전 DUR 유형을 점검한다. DB·OpenAI는 호출하지 않는다.
+tasks.register('tryDurEvidence', JavaExec) {
+    group = 'verification'
+    description = '공개 품목의 DUR 유형별 결과·행 수·시간 점검'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'org.semiproject.pillbadeumserver.chat.DurEvidenceCli'
+}
+
+// 공개 낱알식별 목록을 로컬 캐시에 적재하고 DK/10 인데놀 대조를 확인한다. DB·OpenAI 호출 없음.
+tasks.register('syncPillCatalog', JavaExec) {
+    group = 'verification'
+    description = '낱알식별 카탈로그 적재 및 실제 식별 후보 점검 (--args=refresh)'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'org.semiproject.pillbadeumserver.chat.PillCatalogCli'
+}

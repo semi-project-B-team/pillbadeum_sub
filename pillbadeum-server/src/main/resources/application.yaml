@@ -1,0 +1,157 @@
+# 공통 설정. 개인 값은 환경변수로 받으며, local 프로필만 .env를 읽습니다.
+
+spring:
+  application:
+    name: pillbadeum-server
+
+  profiles:
+    default: local
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    # 설명. 테이블은 sql/ 폴더의 DDL 로 만든다. (엔티티로 테이블을 자동 생성하지 않는다)
+    hibernate:
+      ddl-auto: none
+    # 설명. 컨트롤러 · 뷰까지 DB 연결을 붙잡지 않는다. 지연 로딩은 서비스(@Transactional) 안에서 끝낸다.
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        highlight_sql: true
+        # COMMON-004: LocalDate/Time을 JDBC 4.2로 직접 전달해 JVM 시간대 변경에 따른 java.sql.Date 변환을 피한다.
+        type:
+          java_time_use_direct_jdbc: true
+
+  sql:
+    init:
+      mode: never
+
+  jackson:
+    time-zone: Asia/Seoul
+
+  data:
+    web:
+      pageable:
+        one-indexed-parameters: true
+
+  threads:
+    virtual:
+      enabled: true
+
+  # 설명. 이미지 업로드 크기 (알약 앞 · 뒤 2장을 한 번에 올리므로 요청 전체는 더 크게)
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 21MB
+
+server:
+  port: ${SERVER_PORT:8080}
+
+# 설명. 업로드 파일 저장 위치 (프로젝트 바깥 폴더. Git 에 올라가지 않게)
+file:
+  upload:
+    windows:
+      path: ${FILE_UPLOAD_PATH_WINDOWS:C:/myWs/pillbadeum-uploads}
+    mac:
+      path: ${FILE_UPLOAD_PATH_MAC:/myWs/pillbadeum-uploads}
+
+app:
+  cors:
+    # 설명. 프론트엔드 주소. 여러 개면 쉼표로 구분한다.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+jwt:
+  secret: ${JWT_SECRET:}
+  # 1시간 (밀리초)
+  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:36000000}
+
+photo:
+  # 정식/호환 낱알 경로의 OCR·후보 대기가 공유하는 85초 예산임.
+  pill-timeout-ms: ${PILL_TIMEOUT_MS:85000}
+  # 처방전 OCR 대기 한도임. 낱알85초·채팅60초와 별도로 적용함.
+  prescription-ocr-timeout-ms: ${PRESCRIPTION_OCR_TIMEOUT_MS:60000}
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  base-url: https://api.openai.com/v1
+  model:
+    chat: ${OPENAI_CHAT_MODEL:}
+    decision: ${OPENAI_DECISION_MODEL:}
+    vision: ${OPENAI_VISION_MODEL:}
+    prescription: ${OPENAI_PRESCRIPTION_MODEL:gpt-6-luna}
+    embedding: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+  # 설명. 모델이 지원하는 값만 쓴다. 추론 기능이 없는 모델이면 비워 둔다.
+  reasoning-effort: ${OPENAI_REASONING_EFFORT:}
+  prescription-reasoning-effort: ${OPENAI_PRESCRIPTION_REASONING_EFFORT:max}
+  connect-timeout-ms: 2000
+  short-read-timeout-ms: 10000
+  # 음성(TTS) 읽기 한도임.
+  long-read-timeout-ms: 30000
+  # 대화 답변·요약 생성 읽기 한도임. effort max의 긴 정리 답변이 30초를 넘어 60초로 둠(CHK-42).
+  # 대화 답변은 전체 85초 마감, 요약은 자체 30초 마감 안에서만 기다림.
+  answer-read-timeout-ms: 60000
+  # 개발용 기본 상한. 실제 외부 API 한도와 팀 부하에 맞춰 조정합니다.
+  max-concurrent-calls: ${OPENAI_MAX_CONCURRENT_CALLS:4}
+  permit-timeout-ms: ${OPENAI_PERMIT_TIMEOUT_MS:10000}
+  # Decisions 입력 100만 토큰당 USD. 2026-10-19 공식 기본 단가이며 실제 청구액이 아닌 로그 추정용입니다.
+  decision-input-usd-per-million: ${OPENAI_DECISION_INPUT_USD_PER_MILLION:0.10}
+
+public-data:
+  base-url: https://apis.data.go.kr
+  # 설명. 공공데이터포털 마이페이지의 '일반 인증키(Decoding)' 값
+  service-key: ${PUBLIC_DATA_SERVICE_KEY:}
+  connect-timeout-ms: 2000
+  read-timeout-ms: ${PUBLIC_DATA_READ_TIMEOUT_MS:10000}
+  max-concurrent-calls: ${PUBLIC_DATA_MAX_CONCURRENT_CALLS:4}
+  permit-timeout-ms: ${PUBLIC_DATA_PERMIT_TIMEOUT_MS:10000}
+
+pill-identification:
+  enabled: ${PILL_IDENTIFICATION_ENABLED:true}
+  catalog-file: ${PILL_CATALOG_FILE:./.cache/pill-identification/catalog.json}
+  catalog-refresh-enabled: ${PILL_CATALOG_REFRESH_ENABLED:true}
+
+# 설명. 복약 알림 웹 푸시(VAPID). 키가 비어 있으면 서버는 뜨고 푸시 API만 503. 개인 키는 .env에만 둔다.
+web-push:
+  vapid:
+    public-key: ${VAPID_PUBLIC_KEY:}
+    private-key: ${VAPID_PRIVATE_KEY:}
+    subject: ${VAPID_SUBJECT:}
+  # 설명. 구독 주소로 허용할 브라우저 푸시 서비스. 점으로 시작하면 그 하위 주소 전체를 허용한다.
+  allowed-hosts: ${WEB_PUSH_ALLOWED_HOSTS:fcm.googleapis.com,updates.push.services.mozilla.com,web.push.apple.com,.notify.windows.com}
+  connect-timeout-ms: 2000
+  read-timeout-ms: 5000
+  ttl-seconds: 3600
+  # 설명. 매분 복약 알림을 보내는 스케줄러. 같은 분은 notification_dispatch로 한 번만 보낸다.
+  scheduler:
+    enabled: ${WEB_PUSH_SCHEDULER_ENABLED:true}
+
+# 설명. 벡터 검색(Qdrant). 기본은 꺼짐. Docker로 Qdrant를 띄운 사람만 .env에 QDRANT_ENABLED=true (README 4번)
+qdrant:
+  enabled: ${QDRANT_ENABLED:false}
+  host: ${QDRANT_HOST:localhost}
+  # 설명. gRPC 포트. 6333은 REST · 대시보드용이다.
+  port: ${QDRANT_PORT:6334}
+  # 모델별 컬렉션명은 접두사_모델명UUID_차원으로 생성한다. 기본 모델의 원래 차원은 1536이다.
+  collection-prefix: ${QDRANT_COLLECTION_PREFIX:chat_memory}
+  vector-size: ${QDRANT_VECTOR_SIZE:1536}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+    tags-sorter: alpha
+
+logging:
+  # 로그 시각도 JVM 초기화 순서에 의존하지 않고 한국 시각으로 표시합니다.
+  pattern:
+    dateformat: yyyy-MM-dd'T'HH:mm:ss.SSSXXX,Asia/Seoul
+    level: '%5p [requestId=%X{requestId:-}]'
+  level:
+    org.hibernate.SQL: info
+    org.semiproject.pillbadeumserver: info
