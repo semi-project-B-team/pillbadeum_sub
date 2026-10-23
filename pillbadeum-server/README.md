@@ -49,6 +49,7 @@ Python: `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
 `npx web-push generate-vapid-keys`로 만든 값을 그대로 넣어도 됩니다. 배포 서버 키는 한 번 정하면 바꾸지 않습니다.
 키를 바꾸면 모든 브라우저가 알림을 다시 켜야 합니다. 공개 키와 개인 키가 짝이 아니면 서버를 시작하지 않습니다.
 추론 옵션은 선택한 모델이 지원할 때만 `OPENAI_REASONING_EFFORT`로 지정합니다.
+대화 답변은 `OPENAI_CHAT_REASONING_EFFORT`로 따로 지정하며 기본값은 `high`입니다. IDE/OS 환경변수로도 설정할 수 있습니다. 요약·일정·낱알은 기존 공통값, 처방전은 전용값을 유지합니다. 추론 미지원 대화 모델은 대화 전용값을 비워 둡니다.
 임베딩 기본 모델은 `text-embedding-3-small`입니다. 모델/차원을 바꾸면 Qdrant 컬렉션도 함께 맞춥니다.
 
 ## 2. MySQL 준비
